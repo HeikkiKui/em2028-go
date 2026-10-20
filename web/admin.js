@@ -624,10 +624,11 @@
       });
       return h("tr", null, h("td", null, t.code), h("td", { class: "l" }, inp), h("td", null, btn));
     });
-    box.append(h("h2", null, "Joukkueet"),
+    // box.append kirjoittaisi null-arvon sivulle tekstinä "null", joten tyhjät suodatetaan pois.
+    box.append(...[h("h2", null, "Joukkueet"),
       h("p", { class: "lead" }, "Koodit A1–F4 ovat arvontapaikkoja. Kun arvonta on tehty, anna kullekin paikalle joukkueen nimi."),
       can ? null : h("p", { class: "note" }, "Sinulla ei ole setup-oikeutta, joten nimet ovat vain luettavissa."),
-      h("div", { class: "card" }, h("div", { class: "scroll" }, h("table", null, h("tbody", null, rows)))));
+      h("div", { class: "card" }, h("div", { class: "scroll" }, h("table", null, h("tbody", null, rows))))].filter(Boolean));
   }
 
   /* ---------- kaavio ---------- */
@@ -651,7 +652,7 @@
       apply.disabled = true;
       try { await api("POST", "/admin/bracket/apply"); toast("Parit kirjoitettu"); render(); } catch (e) { handleErr(e); apply.disabled = false; }
     });
-    box.append(h("h2", null, "Kaavio"),
+    box.append(...[h("h2", null, "Kaavio"),
       h("p", { class: "lead" }, "Lohkojen sijoitukset ja kahdeksannesvälierien parit lasketaan UEFAn sääntöjen mukaan syötetyistä tuloksista. Kurinpitopisteet ja karsintaranking eivät ole tiedossa, joten niihin asti ulottuvat tasatilanteet pitää ratkaista käsin."),
       d.thirds.qualifying ? h("p", null, "Neljä parasta kolmosta lohkoista: " + d.thirds.qualifying.split("").join(", ")) : null,
       d.thirds.unresolved ? h("p", { class: "err" }, "Parhaiden kolmosten raja on tasan, joten paikkoja ei voi täyttää automaattisesti.") : null,
@@ -659,7 +660,7 @@
       h("h3", null, "Kahdeksannesvälierät"),
       pairs.length ? h("ul", null, pairs) : h("p", { class: "note" }, "Ei vielä ratkenneita pareja."),
       h("div", { class: "row" }, apply),
-      thirdsEditor(d));
+      thirdsEditor(d)].filter(Boolean));
   }
 
   // Neljän parhaan kolmossijan käsin valinta, kun raja on tasan kaikilla tunnetuilla kriteereillä.
