@@ -1,0 +1,8 @@
+data/
+.secret
+*.db
+*.db-wal
+*.db-shm
+em2028
+em2028.build
+__pycache__/

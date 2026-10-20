@@ -1,0 +1,30 @@
+[Unit]
+Description=EM 2028 veikkaus
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+User=em2028
+Group=em2028
+ExecStart=/opt/em2028/em2028
+EnvironmentFile=/etc/em2028.env
+WorkingDirectory=/var/lib/em2028
+Restart=on-failure
+RestartSec=3
+
+# Rajoitukset: palvelu saa kirjoittaa vain omaan tietokantakansioonsa
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+PrivateDevices=yes
+ReadWritePaths=/var/lib/em2028
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_INET AF_INET6
+CapabilityBoundingSet=
+LockPersonality=yes
+
+[Install]
+WantedBy=multi-user.target

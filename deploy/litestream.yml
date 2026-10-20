@@ -1,0 +1,13 @@
+# Jatkuva varmuuskopiointi Litestreamilla (SQLite -> S3-yhteensopiva tallennustila, esim. UpCloud Object Storage).
+# Asennus ja palautus: katso deploy/LITESTREAM.md. Kopioi palvelimelle: /etc/litestream.yml (chmod 600)
+dbs:
+  - path: /var/lib/em2028/em2028.db
+    replicas:
+      - type: s3
+        bucket: ${LITESTREAM_BUCKET}
+        path: em2028
+        endpoint: ${LITESTREAM_ENDPOINT}
+        access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+        secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}
+        force-path-style: true
+        retention: 336h   # säilytä 14 vuorokautta

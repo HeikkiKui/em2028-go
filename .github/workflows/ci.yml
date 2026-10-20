@@ -1,0 +1,57 @@
+name: CI
+on:
+  push:
+  pull_request:
+
+jobs:
+  go:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - name: Riippuvuudet
+        run: go mod tidy
+      - name: Staattinen tarkistus
+        run: go vet ./...
+      - name: Yksikkö- ja integraatiotestit
+        run: go test ./...
+      - name: Tunnetut haavoittuvuudet
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@latest
+          govulncheck ./...
+      - name: Linux-ohjelman rakennus
+        run: CGO_ENABLED=0 go build -trimpath -o /tmp/em2028 .
+
+  ui:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Selainkäyttöliittymän testit (testipalvelinta vasten)
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+          python e2e/ui/ui_tests.py
+
+  e2e:
+    runs-on: ubuntu-latest
+    needs: [go]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.23'
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Riippuvuudet
+        run: go mod tidy
+      - name: Täysi E2E oikealla palvelimella
+        run: |
+          pip install playwright
+          playwright install --with-deps chromium
+          python e2e/run_e2e.py

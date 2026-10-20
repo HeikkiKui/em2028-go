@@ -1,0 +1,5 @@
+# Kopioi palvelimelle: /etc/caddy/Caddyfile  (vaihda osoite omaksesi)
+veikkaus.example.com {
+	encode zstd gzip
+	reverse_proxy 127.0.0.1:8080
+}
