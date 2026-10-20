@@ -106,6 +106,9 @@ func TestAdminTwoFactorFlow(t *testing.T) {
 	if s.totpEnabled(id) {
 		t.Fatal("kaksivaiheisen pitäisi olla nollattu")
 	}
+	if s.count(`SELECT COUNT(*) FROM admin_log WHERE action='totp.reset' AND admin_nick='(palvelin)'`) != 1 {
+		t.Fatal("totp-resetin pitää näkyä ylläpitolokissa")
+	}
 }
 
 func TestRequireAdminTwoFactor(t *testing.T) {

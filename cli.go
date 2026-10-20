@@ -43,17 +43,7 @@ func runAdminCLI(args []string) int {
 	case args[0] == "delete-user" && len(args) == 2:
 		return cliDeleteUser(db, args[1])
 	case args[0] == "totp-reset" && len(args) == 2:
-		res, err := db.Exec(`DELETE FROM totp WHERE user_id=(SELECT id FROM users WHERE nickname=? COLLATE NOCASE)`, args[1])
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "virhe:", err)
-			return 1
-		}
-		if n, _ := res.RowsAffected(); n == 0 {
-			fmt.Println("Käyttäjällä ei ollut kaksivaiheista kirjautumista.")
-		} else {
-			fmt.Println("Kaksivaiheinen kirjautuminen nollattu: käyttäjä voi ottaa sen uudelleen käyttöön ylläpidossa.")
-		}
-		return 0
+		return cliTOTPReset(db, args[1])
 	case args[0] == "purge-players" && len(args) == 1:
 		return cliPurge(db)
 	case args[0] == "grant" && len(args) == 3:
@@ -104,6 +94,28 @@ func cliChange(db *sql.DB, grant bool, nick, permArg string) int {
 		verb = "poistettu"
 	}
 	fmt.Printf("Oikeudet %s käyttäjälle %s: %s\n", verb, exact, strings.Join(perms, ", "))
+	return 0
+}
+
+func cliTOTPReset(db *sql.DB, nick string) int {
+	var id int64
+	var exact string
+	if err := db.QueryRow(`SELECT id, nickname FROM users WHERE nickname=? COLLATE NOCASE`, nick).Scan(&id, &exact); err != nil {
+		fmt.Fprintf(os.Stderr, "käyttäjää %q ei löydy\n", nick)
+		return 1
+	}
+	res, err := db.Exec(`DELETE FROM totp WHERE user_id=?`, id)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, "virhe:", err)
+		return 1
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		fmt.Println("Käyttäjällä ei ollut kaksivaiheista kirjautumista.")
+		return 0
+	}
+	db.Exec(`INSERT INTO admin_log(at,admin_id,admin_nick,action,detail) VALUES(?,NULL,'(palvelin)','totp.reset',?)`,
+		time.Now().Unix(), fmt.Sprintf("%q", exact))
+	fmt.Println("Kaksivaiheinen kirjautuminen nollattu: käyttäjä voi ottaa sen uudelleen käyttöön ylläpidossa.")
 	return 0
 }
 
