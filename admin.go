@@ -12,7 +12,7 @@ import (
 	"time"
 )
 
-// Ylläpito käyttää samoja tilejä kuin pelaajat (nimimerkki + palautusavain). Oikeudet myönnetään
+// Ylläpito käyttää samoja tilejä kuin pelaajat (sähköposti + salasana). Oikeudet myönnetään
 // vain palvelimella komentorivillä (`em2028 admin grant ...`), ei verkon kautta.
 //
 //	results  tulokset, maalikuningas, kaavion täyttö
@@ -25,7 +25,7 @@ const (
 	permModerate = "moderate"
 	permAudit    = "audit"
 
-	// Ylläpitotoiminnot vaativat tuoreen kirjautumisen (palautusavain annettu viimeisen 12 tunnin aikana).
+	// Ylläpitotoiminnot vaativat tuoreen kirjautumisen (kirjautuminen viimeisen 12 tunnin aikana).
 	adminSessionMax = 12 * 3600
 )
 

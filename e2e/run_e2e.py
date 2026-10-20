@@ -140,7 +140,7 @@ def run(browser, binary, env, db_path, log):
     print("OK   chat: viesti lähti")
 
     # --- lukitus ja satunnaiset viralliset tulokset
-    subprocess.check_call([binary, "dev", "simulate", "all"], env=env)
+    subprocess.check_call([binary, "dev", "simulate", "all", "lock"], env=env)
     eeva.reload()
     eeva.wait_for_selector(".banner.locked")
     eeva.click("nav.tabs button:has-text('Veikkaukset')")

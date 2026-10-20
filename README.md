@@ -6,10 +6,9 @@ Veikkauspalvelu UEFA EURO 2028 -kisoihin: ottelutulokset, maalikuningas, yhteine
 
 ## Käynnistys paikallisesti
 
-Vaatii Go 1.22+. Ensimmäisellä kerralla haetaan riippuvuudet (luo `go.sum`):
+Vaatii Go 1.26+ (ks. `go.mod`). Riippuvuudet haetaan automaattisesti ensimmäisellä ajolla.
 
 ```sh
-go mod tidy
 go vet ./... && go test ./...
 
 export APP_SECRET=$(openssl rand -hex 32)   # TALLENNA TÄMÄ, katso alla
@@ -71,7 +70,7 @@ Jokainen ylläpitäjä näkee Yleiskatsauksen, Ottelut, Joukkueet, Kaavio ja Yll
 
 - **Tuore kirjautuminen:** ylläpitotoiminnot vaativat kirjautumisen (sähköposti + salasana) viimeisen 12 tunnin aikana. Sivu pyytää sen tarvittaessa uudelleen.
 - **Ylläpitäjiin ei voi kohdistaa moderointia:** moderaattori ei voi mykistää, nimetä uudelleen, kirjata ulos tai poistaa toista ylläpitäjää. Ylläpitäjien hallinta tapahtuu vain palvelimella.
-- **Ylläpitoloki:** kaikki muutokset (myös komentorivin grant/revoke) kirjataan: aika, ylläpitäjän nimimerkki, toiminto ja lyhyt kuvaus. Lokiin ei tallenneta chat-viestien sisältöä eikä IP-osoitteita.
+- **Ylläpitoloki:** kaikki muutokset (myös komentorivin grant, revoke, delete-user, totp-reset ja purge-players) kirjataan: aika, ylläpitäjän nimimerkki, toiminto ja lyhyt kuvaus. Lokiin ei tallenneta chat-viestien sisältöä eikä IP-osoitteita.
 - **Tulosten suojat:** tulosta ei voi syöttää ennen ottelun alkamisaikaa (tulos lukitsisi veikkaukset), eikä alkamisaikaa voi muuttaa ottelulle, jolla on tulos. Jos pudotuspelin joukkueet vaihdetaan ottelulle, jolla on jo veikkauksia, sivu kysyy ensin vahvistuksen, koska veikkaukset nollataan.
 - **Nopeusrajoitus:** 3 ylläpitotoimintoa sekunnissa käyttäjää kohti.
 
@@ -135,7 +134,17 @@ Muiden pelaajien veikkaukset näkyvät lohkopeleistä vasta lukituksen jälkeen.
 
 ## UpCloud (tai mikä tahansa Ubuntu-palvelin)
 
-Valmiit tiedostot ovat kansiossa `deploy/`: `setup-server.sh` (kertaasennus), `em2028.service` (systemd), `Caddyfile` (HTTPS), `env.example` (asetukset), `backup.sh` (varmuuskopiot) ja `deploy.sh` (päivitys omalta koneelta yhdellä komennolla). Vaiheittaiset ohjeet on keskusteluvastauksessa, jossa tämä paketti toimitettiin; lyhyesti: luo palvelin, osoita domain siihen, aja `setup-server.sh`, kopioi tiedostot paikoilleen, täytä `/etc/em2028.env`, aja `deploy/deploy.sh`.
+Valmiit tiedostot ovat kansiossa `deploy/`: `setup-server.sh` (kertaasennus), `em2028.service` (systemd), `Caddyfile` (HTTPS), `env.example` (asetukset), `backup.sh` (varmuuskopiot) ja `deploy.sh` (päivitys omalta koneelta yhdellä komennolla). Vaiheet:
+
+1. Luo Ubuntu-palvelin ja osoita domain (A/AAAA-tietue) siihen.
+2. Kopioi `deploy/`-kansio palvelimelle ja aja siellä `sudo bash setup-server.sh` (Caddy, palomuuri, käyttäjä `em2028`, kansiot).
+3. Kopioi tiedostot paikoilleen:
+   - `em2028.service` → `/etc/systemd/system/em2028.service`
+   - `Caddyfile` → `/etc/caddy/Caddyfile` (vaihda osoite omaksesi)
+   - `backup.sh` → `sudo install -m 755 backup.sh /usr/local/bin/em2028-backup` ja ajastus tiedoston alun ohjeen mukaan
+   - `env.example` → `/etc/em2028.env`, täytä arvot ja aseta `chmod 600`
+4. `sudo systemctl daemon-reload && sudo systemctl enable em2028 && sudo systemctl reload caddy`
+5. Omalta koneelta: `deploy/deploy.sh käyttäjä@palvelin` (testaa, rakentaa, kopioi ja käynnistää palvelun). Samalla komennolla päivität myöhemmin.
 
 ## Tuotantoon
 
@@ -167,7 +176,7 @@ sudo useradd --system --home /var/lib/em2028 em2028
 sudo -u em2028 DB_PATH=/var/lib/em2028/em2028.db /opt/em2028/em2028 admin grant Matti all
 ```
 
-Palvelun asetuksissa: `User=em2028`, `StateDirectory=em2028`, `EnvironmentFile=/etc/em2028.env` (oikeudet 600), `ADDR=127.0.0.1:8080`, `TRUST_PROXY=true`, `NoNewPrivileges=yes`, `ProtectSystem=strict`.
+Valmis palvelutiedosto on `deploy/em2028.service`: `User=em2028`, `WorkingDirectory=/var/lib/em2028`, `ReadWritePaths=/var/lib/em2028`, `EnvironmentFile=/etc/em2028.env` (oikeudet 600), `NoNewPrivileges=yes`, `ProtectSystem=strict`. Asetukset `ADDR=127.0.0.1:8080` ja `TRUST_PROXY=true` ovat ympäristötiedostossa (`deploy/env.example`).
 
 ## Tietoturva ja tietosuoja
 
@@ -196,14 +205,14 @@ Pelaajan oikeudet: **Tili**-välilehdeltä voi vaihtaa salasanan tai poistaa tun
 
 - **Nyt tallennetaan henkilötietoja (sähköposti).** Se tuo velvoitteita: tietosuojaseloste, tietojen poisto pyynnöstä (Tili-välilehti hoitaa pelaajan puolesta), ja tietomurrosta ilmoittaminen tietosuojavaltuutetulle 72 tunnin kuluessa. Jos et halua velvoitteita, voit palata aiempaan avainmalliin.
 - **Rekisteröinti paljastaa, onko sähköposti jo käytössä** (virheilmoitus "tällä sähköpostilla on jo tunnus"). Kirjautuminen ja salasanan palautus eivät paljasta sitä. Rekisteröintiä rajoitetaan IP-kohtaisesti.
-- **Salasanojen vuotaneisiin listoihin ei verrata** (esim. Have I Been Pwned), jotta mitään ei lähetetä ulkopuolelle. Tarkistus on helppo lisätä.
+- **Vuotaneiden salasanojen tarkistus on oletuksena pois päältä**, jotta mitään ei lähetetä ulkopuolelle. `PWNED_CHECK=true` ottaa sen käyttöön (Have I Been Pwned, k-anonymiteetti: palveluun lähtee vain 5 merkkiä salasanan SHA-1-tiivisteestä). Jos palvelu ei vastaa, salasana hyväksytään.
 - **Sähköpostin vaihto ei ole vielä mahdollista** Tili-välilehdeltä. Salasanan palautus toimii vain rekisteröidyllä osoitteella.
 - **Ylläpitäjän tunnus on avain koko järjestelmään.** Käytä pitkää, ainutlaatuista salasanaa ja anna vain tarvittavat oikeudet.
 - **Nimimerkit, pisteet ja chat-viestit näkyvät kaikille kirjautuneille pelaajille.** Muistuta pelaajia olemaan käyttämättä oikeaa nimeään ja olemaan kirjoittamatta henkilötietojaan chattiin.
 - **Chat ei ole reaaliaikainen:** selain hakee uudet viestit 4 sekunnin välein. Se riittää satoihin yhtäaikaisiin käyttäjiin yhdellä palvelimella. Tuhansilla kävijöillä vaihda WebSocketiin tai SSE:hen.
 - **Moderointi on käsityötä.** Nimimerkeille ei ole sanasuodatinta, joten seuraa chattiä ja käytä Käyttäjät- ja Chat-näkymiä.
 - **HTTPS on pakollinen tuotannossa.** Ilman sitä eväste ja avain kulkisivat selkokielisinä.
-- Varmuuskopioi tietokanta salattuna (SQLiten `.backup`-komennolla, ei suoraan tiedostoa kopioiden) ja pidä `APP_SECRET` erillään siitä.
+- Varmuuskopioi tietokanta SQLiten `.backup`-komennolla, ei suoraan tiedostoa kopioiden, ja pidä `APP_SECRET` erillään siitä. `deploy/backup.sh` tekee tämän, mutta **ei salaa kopioita**: se säilyttää ne palvelimella kansiossa `/var/backups/em2028` (oikeudet 600). Jos siirrät kopiot muualle, salaa ne ensin (esim. `age` tai `gpg`).
 - Koodia ei ole ulkopuolisen tarkastettu eikä tietoturvatestattu. Aja ennen julkaisua `go vet ./...`, `go test ./...` ja `govulncheck ./...`, ja harkitse ulkopuolista katselmusta, jos kävijöitä on paljon.
 - Nopeusrajoitus on muistissa, eli yhden instanssin malli.
 
@@ -216,7 +225,7 @@ Pelaajan oikeudet: **Tili**-välilehdeltä voi vaihtaa salasanan tai poistaa tun
 - **Pudotuspelit avautuvat, kun lohkot on veikattu:** ennen sitä sivu kertoo selkeästi, mitä puuttuu.
 - **Selkokieliset termit:** taulukossa Pelit, Maalit ja Pisteet. Tulostaulussa vain pisteet, ja lisätiedot näkyvät pelaajan omalla sivulla.
 - **Ensikertalaisen opas** (yksi rivi, piilotettavissa) ja **tiivis tilarivi**: milloin veikkaukset sulkeutuvat ja kuinka paljon on tehty.
-- Isompi kirjasin (17 px), isot kosketuskohteet ja neljä välilehteä, jotka mahtuvat puhelimen leveyteen.
+- Selkeä 16 px:n kirjasin, isot kosketuskohteet ja neljä välilehteä, jotka mahtuvat puhelimen leveyteen.
 
 ## Ominaisuudet ja ylläpidon lisät
 
@@ -224,10 +233,10 @@ Pelaajan oikeudet: **Tili**-välilehdeltä voi vaihtaa salasanan tai poistaa tun
 - **Kaaviopuu** (Veikkaukset → Kaavio): pudotuspelit puuna, oikeat tulokset ja pisteet näkyvät lukituksen jälkeen.
 - **Toisen pelaajan veikkaukset:** lukituksen jälkeen tulostaulun nimestä aukeaa pelaajan koko kaavio, tulokset ja pisteet.
 - **Sijoituksen muutos:** tulostaulussa ▲/▼ verrattuna päivän alun tilanteeseen (tallennetaan päivittäin).
-- **Sähköpostimuistutus:** 24 h ja 1 h ennen lukitusta, vain jos veikkaukset ovat kesken. Peruutus yhdellä klikkauksella (`/unsubscribe.html`) tai Tili-välilehdeltä.
+- **Sähköpostimuistutus:** 24 h ja 1 h ennen lukitusta, vain jos veikkaukset ovat kesken ja sähköposti on vahvistettu. Peruutus yhdellä klikkauksella (`/unsubscribe.html`) tai Tili-välilehdeltä.
 - **Tietojen lataus** (Tili → Lataa tietoni) ja **tilin poisto**. Jaa veikkaus -painike mestarin ilmoittamiseen.
 - **Asennettava sovellus (PWA):** `manifest.json` ja kuvakkeet, jolloin sivun voi lisätä puhelimen kotinäytölle.
-- **Chatin ilmiannot:** kolme ilmiantoa piilottaa viestin muilta, kunnes ylläpito käsittelee sen.
+- **Chatin ilmiannot:** kun kolme eri pelaajaa ilmiantaa viestin, se piiloutuu muilta. Ylläpito näkee piilotetut viestit ilmiantojen määrän kanssa ja voi poistaa ne. Ilmiantoja ei voi nollata, joten piilotettu viesti ei palaa näkyviin.
 
 **Ylläpitäjälle** (`/admin.html`)
 - **Kaksivaiheinen kirjautuminen (TOTP)** Authenticator-sovelluksella: Ylläpitäjät ja loki -näkymästä käyttöön. Puhelimen kadotessa: `em2028 admin totp-reset <nimimerkki>`.
@@ -252,8 +261,7 @@ python e2e/run_e2e.py                # koko polku OIKEALLA palvelimella: rekiste
 ```
 
 Python-testit vaativat `pip install playwright && playwright install chromium`. GitHub Actions (`.github/workflows/ci.yml`)
-ajaa kaiken (myös `govulncheck`) jokaisella muutoksella. **Huom:** `go test` ja `run_e2e.py` on kirjoitettu ilman Go-kääntäjää
-eikä niitä ole ajettu: aja ne ensimmäiseksi ja korjaa mahdolliset käännösvirheet.
+ajaa kaiken (myös `govulncheck`) jokaisella muutoksella.
 
 ## Rakenne
 
@@ -266,7 +274,7 @@ password.go    argon2id, salasanasäännöt, sähköpostin salaus
 mail.go        SMTP (TLS pakollinen) ja viestipohjat
 handlers.go    API: tili, ottelut, veikkaukset, tulostaulu, chat
 admin.go       ylläpito-API: oikeudet, ottelut, joukkueet, käyttäjät, chat, loki
-cli.go         em2028 admin list|grant|revoke
+cli.go         em2028 admin list|grant|revoke|delete-user|totp-reset|purge-players
 dev.go         em2028 dev simulate|clear (vain testaukseen)
 board.go       tulostaulu: välimuisti, sijoituksen muutos, päivän tilannekuvat
 reminders.go   muistutukset, peruutuslinkki, webhook-ilmoitukset, asetukset
@@ -282,5 +290,5 @@ scoring.go     pisteytys
 predictions.go lukitus, oma kaavio, jatkopisteet, tulostaulu
 db.go          SQLite-skeema ja otteluohjelma (51 ottelua)
 *_test.go      pisteytys, kaavio, chat, tili- ja salasanavirrat, ylläpidon pääsynhallinta
-web/           käyttöliittymä (embed): index.html + app.js, admin.html + admin.js, verify/reset/privacy.html, bling.js (konfetti), style.css
+web/           käyttöliittymä (embed): index.html + app.js, admin.html + admin.js, verify/reset/unsubscribe.html + pages.js, privacy.html, style.css, manifest.json ja kuvakkeet
 ```
